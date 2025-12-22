@@ -1,0 +1,5 @@
+{
+  "name": "MAC (Multi-Age Classroom) Scheduler",
+  "description": "A drop-in daycare scheduling application managing capacity for infants, toddlers, and preschoolers with teacher approval workflows.",
+  "requestFramePermissions": []
+}
