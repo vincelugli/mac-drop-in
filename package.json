@@ -1,5 +1,5 @@
 {
-  "name": "MAC (Multi-Age Classroom)-scheduler",
+  "name": "mac-drop-in-scheduler",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,7 +12,8 @@
     "lucide-react": "^0.562.0",
     "react-dom": "^19.2.3",
     "recharts": "^3.6.0",
-    "react": "^19.2.3"
+    "react": "^19.2.3",
+    "firebase": "^12.7.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
