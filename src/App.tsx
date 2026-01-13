@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { AppState, Booking } from './types';
+import { AppState, Booking, ParentProfile } from './types';
 import { ParentView } from './views/ParentView';
 import { TeacherView } from './views/TeacherView';
+import { LoginView } from './views/LoginView';
+import { ParentLoginView } from './views/ParentLoginView';
 import { Sprout } from 'lucide-react';
 import { getLocalISOString } from './utils';
+import { subscribeToBookings, subscribeToTeacherCount, addBooking, updateBookingStatus, setTeacherCount as saveTeacherCount } from './services';
 
 const INITIAL_STATE: AppState = {
   bookings: [],
@@ -12,30 +15,52 @@ const INITIAL_STATE: AppState = {
 };
 
 const App: React.FC = () => {
-  // Simple view routing state
   const [currentView, setCurrentView] = useState<'HOME' | 'PARENT' | 'TEACHER'>('HOME');
-  
-  // App Domain State
-  // In a real app, this would persist to a DB. For this demo, we use local state.
   const [appState, setAppState] = useState<AppState>(INITIAL_STATE);
+  const [loading, setLoading] = useState(true);
+  const [isTeacherAuthenticated, setIsTeacherAuthenticated] = useState(false);
+  const [currentParent, setCurrentParent] = useState<ParentProfile | null>(null);
+  const [showParentLogin, setShowParentLogin] = useState(false);
 
-  const addBooking = (booking: Booking) => {
-    setAppState(prev => ({
-      ...prev,
-      bookings: [...prev.bookings, booking]
-    }));
-  };
+  // Subscribe to Firebase Data
+  useEffect(() => {
+    const unsubBookings = subscribeToBookings((bookings) => {
+      setAppState(prev => ({ ...prev, bookings }));
+    });
 
-  const updateBookingStatus = (id: string, status: 'APPROVED' | 'DENIED') => {
-    setAppState(prev => ({
-      ...prev,
-      bookings: prev.bookings.map(b => b.id === id ? { ...b, status } : b)
-    }));
-  };
-
-  const setTeacherCount = (count: number) => {
+    const unsubConfig = subscribeToTeacherCount((count) => {
       setAppState(prev => ({ ...prev, teacherCount: count }));
+      setLoading(false);
+    });
+
+    return () => {
+      unsubBookings();
+      unsubConfig();
+    };
+  }, []);
+
+  const handleAddBooking = async (booking: Booking) => {
+    try {
+        await addBooking(booking);
+    } catch (e: any) {
+        alert(e.message || "Failed to book");
+        throw e;
+    }
   };
+
+  const handleUpdateStatus = async (id: string, status: 'APPROVED' | 'DENIED') => {
+    const booking = appState.bookings.find(b => b.id === id);
+    if (!booking) return;
+    await updateBookingStatus(booking, status);
+  };
+
+  const handleSetTeacherCount = (count: number) => {
+      saveTeacherCount(count);
+  };
+
+  if (loading) {
+      return <div className="min-h-screen flex items-center justify-center text-slate-400">Loading scheduler...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
@@ -51,13 +76,13 @@ const App: React.FC = () => {
                     <Sprout className="w-6 h-6" />
                 </div>
                 <h1 className="text-xl font-display font-bold text-slate-800 tracking-tight">
-                    Little<span className="text-primary">Sprouts</span>
+                    MAC<span className="text-primary">(Multi-age classroom)</span>
                 </h1>
             </div>
 
             <div className="flex gap-2">
                 <button 
-                    onClick={() => setCurrentView('PARENT')}
+                    onClick={() => { setCurrentView('PARENT'); setShowParentLogin(false); }}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${currentView === 'PARENT' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
                 >
                     Parents
@@ -84,7 +109,7 @@ const App: React.FC = () => {
                     Drop-in scheduling <br/> made <span className="text-primary">simple</span>.
                 </h1>
                 <p className="text-xl text-slate-500 mb-10 max-w-xl mx-auto">
-                    Manage capacity, approve requests, and keep your classrooms happy with LittleSprouts Scheduler.
+                    Manage capacity, approve requests, and keep your classrooms happy with MAC (Multi-age Classroom) Scheduler.
                 </p>
                 <div className="flex gap-4 justify-center">
                     <button 
@@ -104,11 +129,28 @@ const App: React.FC = () => {
         )}
 
         {currentView === 'PARENT' && (
-            <ParentView state={appState} addBooking={addBooking} />
+            showParentLogin && !currentParent ? (
+                <ParentLoginView 
+                    onLogin={(profile) => { setCurrentParent(profile); setShowParentLogin(false); }} 
+                    onCancel={() => setShowParentLogin(false)}
+                />
+            ) : (
+                <ParentView 
+                    state={appState} 
+                    addBooking={handleAddBooking} 
+                    parentProfile={currentParent}
+                    onLogout={() => setCurrentParent(null)}
+                    onLoginClick={() => setShowParentLogin(true)}
+                />
+            )
         )}
 
         {currentView === 'TEACHER' && (
-            <TeacherView state={appState} updateBookingStatus={updateBookingStatus} setTeacherCount={setTeacherCount} />
+            !isTeacherAuthenticated ? (
+                <LoginView onSuccess={() => setIsTeacherAuthenticated(true)} />
+            ) : (
+                <TeacherView state={appState} updateBookingStatus={handleUpdateStatus} setTeacherCount={handleSetTeacherCount} />
+            )
         )}
 
       </main>
